@@ -1,0 +1,421 @@
+#include<Servo.h>
+#include <TimerOne.h>
+
+#define GPSget Serial2
+#define DebugSerial Serial
+#define GprsSerail Serial3
+#define GPRMC_TERM "$GPRMC,"    //定义要解析的指令，因为这条指令包含定位和时间信息
+#define Success 1U
+#define Failure 0U
+
+int L=28;
+
+unsigned long  Time_Cont = 0;       //定时器计数器
+
+char a_y[]="1";
+char a_n[]="0";
+
+const unsigned int gprsRxBufferLength = 600;
+char gprsRxBuffer[gprsRxBufferLength];
+unsigned int gprsBufferCount = 0;
+char OneNetServer[] = "api.heclouds.com";       //不需要修改
+
+char device_id[] = "542005309";    //修改为自己的设备ID
+char API_KEY[] = "IvYhykyRqpoN6zhm5Wz1HKy=NJg=";    //修改为自己的API_KEY
+char sensor_gps[] = "loc";
+
+char lon_str[15];
+char lat_str[15];
+
+char nmeaSentence[68];
+String latitude;    //纬度
+String longitude;   //经度
+
+int isfull=0;
+
+Servo myServo;
+int buzzer=2;
+int red_line=6;
+int TrigPin3=7;
+int EchoPin3=8;
+int ledPin=12;
+int button=13;
+int distance3;
+int Switch;
+
+void setup() {
+pinMode(EchoPin3,INPUT);
+pinMode(TrigPin3,OUTPUT);
+pinMode(buzzer,OUTPUT);
+pinMode(ledPin,OUTPUT);
+pinMode(red_line,INPUT);
+pinMode(button,INPUT_PULLUP);
+myServo.attach(9);
+myServo.write(90);
+
+    DebugSerial.begin(19200);
+    GprsSerail.begin(19200);
+    GPSget.begin(9600);
+    Timer1.initialize(1000);
+    Timer1.attachInterrupt(Timer1_handler);
+    initGprs();
+    DebugSerial.println("\r\nsetup end!");
+}
+void loop() {
+  distance3=ping3();
+  if(distance3<=5&&distance3>2)
+  isfull=isfull+1;
+  int buttonState=digitalRead(button);
+  int red_line_get=digitalRead(red_line);
+  
+  if(buttonState==1)
+  {
+     myServo.write(21);/*垃圾桶打开*/
+    Switch=1;
+    isfull=-1300;
+    
+    }
+  else
+   {
+    if((isfull>270)&&(Switch==0))
+    {
+      delay(1000);
+      //initGprs();
+      while(buttonState==0)
+      {
+        for(int k=0;k<10;k++)
+        alarm();
+        for(int pl=0;pl<2;pl++)       
+        gpsToOnenet(1);
+        buttonState=digitalRead(button);
+        
+      }
+    }
+    else
+    {
+      if(red_line_get==0)  
+      {
+        myServo.write(21);     
+        delay(3200);
+        isfull=0;
+        for(int i=21;i<=86;i++)
+         {
+          myServo.write(i);
+          delay(55);
+         }
+        gpsToOnenet(0);
+      }
+      else
+      {
+        if(Switch==1)
+        {
+          delay(1000);
+          for(int i=21;i<=86;i++)
+         {
+          myServo.write(i);
+          delay(55);
+         }
+          isfull=0;
+          Switch=0;
+        }
+      }
+    }
+   }
+}
+
+int ping3()
+{
+  int duration3;
+  digitalWrite(TrigPin3,LOW);
+  delayMicroseconds(2);
+  digitalWrite(TrigPin3,HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TrigPin3,LOW);
+  duration3=pulseIn(EchoPin3,HIGH)/58;
+ //Serial.println(duration3);
+  return duration3;
+  }
+void alarm()
+  {
+    digitalWrite(buzzer,HIGH);
+    digitalWrite(ledPin,HIGH);
+    delay(100);
+    digitalWrite(buzzer,LOW);
+    digitalWrite(ledPin,LOW);
+    delay(100);
+    }
+    
+void gpsToOnenet(int is){
+  // For one second we parse GPS data and report some key values
+            
+    for (unsigned long start = millis(); millis() - start < 1000;)  //一秒钟内不停扫描GPS信息
+  {
+    while (GPSget.available())  //串口获取到数据开始解析
+    {
+      char c = GPSget.read(); //读取一个字节获取的数据
+      
+      switch(c)         //判断该字节的值
+      {
+      case '$':         //若是$，则说明是一帧数据的开始
+        GPSget.readBytesUntil('*', nmeaSentence, 67);   //读取接下来的数据，存放在nmeaSentence字符数组中，最大存放67个字节
+       // GPSget.println(nmeaSentence);
+        latitude = parseGprmcLat(nmeaSentence); //获取纬度值 String 
+        longitude = parseGprmcLon(nmeaSentence);//获取经度值  String
+          if((latitude > "")&&(longitude > ""))
+          {
+            for(int c=0;c<=9;c++)
+            lon_str[c]=longitude.charAt(c);
+            for(int b=0;b<=8;b++)
+            lat_str[b]=latitude.charAt(b); 
+            DebugSerial.println(lat_str);
+            DebugSerial.println(lon_str); 
+            postGpsDataToOneNet(API_KEY,device_id,sensor_gps,lon_str,lat_str,is);  //开始传输数据
+          }          
+      }
+    }
+  }
+  delay(2000);
+  delay(5000);
+}
+
+
+double longitudeToOnenetFormat(char* lon_str_temp)
+{
+  double lon_temp = 0;
+  long lon_Onenet = 0;
+  int dd_int = 0;
+  long mm_int = 0;
+  double lon_Onenet_double = 0;
+  
+  lon_temp = atof(lon_str_temp);
+  lon_Onenet =lon_temp*100000;  //转换为整数
+
+  dd_int = lon_Onenet/10000000; //取出dd
+
+  mm_int = lon_Onenet%10000000;  //取出MM部分
+
+  lon_Onenet_double = dd_int + (double)mm_int/60/100000;//换算为Onenet格式
+
+  return lon_Onenet_double;
+}
+
+double latitudeToOnenetFormat(char* lat_str_temp)
+{
+  double lat_temp = 0;
+  long lat_Onenet = 0;
+  int dd_int = 0;
+  long mm_int = 0;
+  double lat_Onenet_double = 0;
+
+  lat_temp = atof(lat_str_temp);
+  lat_Onenet =lat_temp*100000;  //转换为整数
+
+  dd_int = lat_Onenet/10000000; //取出dd
+
+  mm_int = lat_Onenet%10000000;  //取出MM部分
+
+  lat_Onenet_double = dd_int + (double)mm_int/60/100000;//换算为Onenet格式
+
+  return lat_Onenet_double;
+}
+
+void postGpsDataToOneNet(char* API_VALUE_temp,char* device_id_temp,char* sensor_id_temp,char* lon_temp,char* lat_temp,int a)
+{
+    char send_buf[400]= {0};
+    char text[100] = {0};
+    char tmp[25] = {0};
+    char b[]="0";
+    char lon_str_end[15] = {0};
+    char lat_str_end[15] = {0};
+
+    dtostrf(longitudeToOnenetFormat(lon_temp),3,6, lon_str_end);  //转换成字符串输出
+    dtostrf(latitudeToOnenetFormat(lat_temp),2,6, lat_str_end);  //转换成字符串输出
+
+    //连接服务器
+    memset(send_buf, 0, 400);    //清空
+    strcpy(send_buf, "AT+CIPSTART=\"TCP\",\"");
+    strcat(send_buf, OneNetServer);
+    strcat(send_buf, "\",80\r\n");
+    if (sendCommand(send_buf, "CONNECT", 10000, 5) == Success);
+    else GPRS_ERROR(7);
+
+    //发送数据
+    if (sendCommand("AT+CIPSEND\r\n", ">", 3000, 1) == Success);
+    else GPRS_ERROR(8);
+
+    memset(send_buf, 0, 400);    //清空
+
+    /*准备JSON串*/
+    //ARDUINO平台不支持sprintf的double的打印，只能转换到字符串然后打印
+    if(a==0)
+      sprintf(text,"{\"datastreams\":[{\"id\":\"%s\",\"datapoints\":[{\"value\":{\"lon\":%s,\"lat\":%s,\"is\":%s}}]}]}",sensor_id_temp,lon_str_end,lat_str_end,b);
+    else
+      sprintf(text,"{\"datastreams\":[{\"id\":\"%s\",\"datapoints\":[{\"value\":{\"lon\":%s,\"lat\":%s}}]}]}",sensor_id_temp,lon_str_end,lat_str_end);
+  
+    /*准备HTTP报头*/
+    send_buf[0] = 0;
+    strcat(send_buf,"POST /devices/");
+    strcat(send_buf,device_id_temp);
+    strcat(send_buf,"/datapoints HTTP/1.1\r\n");//注意后面必须加上\r\n
+    strcat(send_buf,"api-key:");
+    strcat(send_buf,API_VALUE_temp);
+    strcat(send_buf,"\r\n");
+    strcat(send_buf,"Host:");
+    strcat(send_buf,OneNetServer);
+    strcat(send_buf,"\r\n");
+    sprintf(tmp,"Content-Length:%d\r\n\r\n", strlen(text));//计算JSON串长度
+    strcat(send_buf,tmp);
+    strcat(send_buf,text);
+
+    if (sendCommand(send_buf, send_buf, 3000, 1) == Success);
+    else GPRS_ERROR(9);
+
+    char sendCom[2] = {0x1A};
+    if (sendCommand(sendCom, "\"succ\"}", 3000, 1) == Success);
+    else GPRS_ERROR(10);
+
+    if (sendCommand("AT+CIPCLOSE\r\n", "CLOSE OK", 3000, 1) == Success);
+    else GPRS_ERROR(11);
+
+    if (sendCommand("AT+CIPSHUT\r\n", "SHUT OK", 3000, 1) == Success);
+    else GPRS_ERROR(11);
+}
+
+void initGprs()
+{
+    if (sendCommand("AT\r\n", "OK", 3000, 10) == Success);
+    else GPRS_ERROR(1);
+
+
+    if (sendCommand("AT+CREG?\r\n", "OK", 3000, 10) == Success);
+    else GPRS_ERROR(2);
+
+    if (sendCommand("AT+CGCLASS=\"B\"\r\n", "OK", 3000, 2) == Success);
+    else GPRS_ERROR(3);
+
+    if (sendCommand("AT+CGDCONT=1,\"IP\",\"CMNET\"\r\n", "OK", 3000, 2) == Success);
+    else GPRS_ERROR(4);
+
+    if (sendCommand("AT+CGATT=1\r\n", "OK", 3000, 2) == Success);
+    else GPRS_ERROR(5);
+
+    if (sendCommand("AT+CLPORT=\"TCP\",\"2000\"\r\n", "OK", 3000, 2) == Success);
+    else GPRS_ERROR(6); 
+}
+
+void(* resetFunc) (void) = 0; //制造重启命令 
+
+void GPRS_ERROR(int num)  
+{
+    DebugSerial.print("ERROR");
+    DebugSerial.println(num);
+    while (1)
+    {
+        digitalWrite(L, HIGH);
+        delay(300);
+        digitalWrite(L, LOW);
+        delay(300);
+
+        if (sendCommand("AT\r\n", "OK", 100, 10) == Success)
+        {
+            DebugSerial.print("\r\nRESET!!!!!!\r\n");
+            resetFunc();
+        }
+    }
+}
+
+unsigned int sendCommand(char *Command, char *Response, unsigned long Timeout, unsigned char Retry)
+{
+    clrGprsRxBuffer();
+    for (unsigned char n = 0; n < Retry; n++)
+    {
+        DebugSerial.print("\r\n---------send AT Command:---------\r\n");
+        DebugSerial.write(Command);
+
+        GprsSerail.write(Command);
+
+        Time_Cont = 0;
+        while (Time_Cont < Timeout)
+        {
+            gprsReadBuffer();
+            if(strstr(gprsRxBuffer, Response) != NULL)
+            {
+                DebugSerial.print("\r\n==========receive AT Command:==========\r\n");
+                DebugSerial.print(gprsRxBuffer); //输出接收到的信息
+                clrGprsRxBuffer();
+                return Success;
+            }
+        }
+        Time_Cont = 0;
+    }
+    DebugSerial.print("\r\n==========receive AT Command:==========\r\n");
+    DebugSerial.print(gprsRxBuffer);//输出接收到的信息
+    clrGprsRxBuffer();
+    return Failure;
+}
+
+void Timer1_handler(void)
+{
+    Time_Cont++;
+}
+
+void gprsReadBuffer() {
+    while (GprsSerail.available())
+    {
+        gprsRxBuffer[gprsBufferCount++] = GprsSerail.read();
+        if (gprsBufferCount == gprsRxBufferLength)clrGprsRxBuffer();
+    }
+}
+
+void clrGprsRxBuffer(void)
+{
+    memset(gprsRxBuffer, 0, gprsRxBufferLength);      //清空
+    gprsBufferCount = 0;
+}
+
+String parseGprmcLat(String s)
+{
+  int pLoc = 0; //paramater location pointer
+  int lEndLoc = 0; //lat parameter end location
+  String lat;
+  if(s.substring(0,4) == "GPRM")
+  {
+    //Serial.println(s);
+    for(int i = 0; i < 5; i++)
+    {
+      if(i < 3) 
+      {
+        pLoc = s.indexOf(',', pLoc+1);
+      }
+      if(i == 3)
+      {
+        lEndLoc = s.indexOf(',', pLoc+1);
+        lat = s.substring(pLoc+1, lEndLoc);
+      }
+    }
+    return lat; 
+  }
+}
+String parseGprmcLon(String s)
+{
+  int pLoc = 0; //paramater location pointer
+  int lEndLoc = 0; //lat parameter end location
+  String lon;
+  if(s.substring(0,4) == "GPRM")
+  {
+    //Serial.println(s);
+    for(int i = 0; i < 7; i++)
+    {
+      if(i < 5) 
+      {
+        pLoc = s.indexOf(',', pLoc+1);
+      }
+      if(i == 5)
+      {
+        lEndLoc = s.indexOf(',', pLoc+1);
+        lon = s.substring(pLoc+1, lEndLoc);
+      }
+    }
+    return lon; 
+  }
+}
