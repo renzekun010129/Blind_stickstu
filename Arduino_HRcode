@@ -1,0 +1,100 @@
+// defines pins numbers
+const int trigPin = 9;
+const int echoPin = 10;
+
+float cm; 
+
+// defines variables
+long duration;
+int distance;
+
+void setup() 
+{
+  Serial.begin(9600); 
+  pinMode(11, OUTPUT);  //发红色光
+  pinMode(12, OUTPUT);  //发蓝色光
+  pinMode(13, OUTPUT);   //发绿色光
+  pinMode(trigPin, OUTPUT);   // Sets the trigPin as an Output
+  pinMode(6, OUTPUT);   //VIBRATOR
+  pinMode(3,OUTPUT);  //BUZZER
+  pinMode(echoPin, INPUT);  // Sets the echoPin as an Input
+}
+void loop() 
+{
+  //发一个10ms的高脉冲去触发TrigPin 
+
+digitalWrite(trigPin, LOW); 
+
+delayMicroseconds(2); 
+
+digitalWrite(trigPin, HIGH); 
+
+delayMicroseconds(10); 
+
+digitalWrite(trigPin, LOW); 
+
+ 
+
+cm = pulseIn(echoPin, HIGH) / 58.0; //算成厘米 
+
+cm = (int(cm * 100.0)) / 100.0; //保留两位小数 
+
+Serial.print(cm); 
+
+Serial.print("cm"); 
+
+Serial.println(); 
+
+delay(1000); 
+
+ 
+
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+
+  // Calculating the distance
+  distance= duration*0.034/2;
+ 
+
+  if(cm<25)
+  {
+    Serial.print("warning"); 
+    digitalWrite(11,HIGH); digitalWrite(12,LOW); digitalWrite(13,LOW);
+    analogWrite(6,140); 
+    tone(3,1000,1000);
+  }
+  else if(cm<50)
+  {
+    Serial.print("narrow");
+    digitalWrite(11,LOW); digitalWrite(12,HIGH); digitalWrite(13,LOW);
+     analogWrite(6,90); 
+    tone(3,1000,1000);
+  }
+  else if(cm<75)
+  {
+    Serial.print("OK");
+    digitalWrite(11,LOW); digitalWrite(12,LOW); digitalWrite(13,HIGH);
+      analogWrite(6,60);
+    analogWrite(3,255);
+  }
+  else if(cm<100)
+  {
+    Serial.print("safe");
+    digitalWrite(11,HIGH); digitalWrite(12,LOW); digitalWrite(13,LOW);
+    analogWrite(6,30); 
+    analogWrite(3,255);
+  }
+  else
+  {
+    Serial.print("very safe");
+    digitalWrite(11,LOW); digitalWrite(12,LOW); digitalWrite(13,HIGH);
+    analogWrite(6,0);
+    analogWrite(3,0);
+    noTone(3); 
+  }
+ 
+
+
+
+
+}
