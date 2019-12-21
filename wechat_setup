@@ -1,0 +1,163 @@
+3.	
+4.	  onLoad: function () {
+5.	    var that = this//不要漏了这句，很重要
+6.	    wx.request({
+7.	      url: 'http://api.heclouds.com/devices/576932530',
+8.	      headers: {
+9.	        'Content-Type': 'application/json',
+10.	        'api-key':'zoRJuv0JCc5c5Is8U2DlD62nDRo='
+11.	      },
+12.	      success: function (res) {
+13.	        that.setData({
+14.	          longitude: res.data.longitude,
+15.	          latitude: res.data.latitude,
+16.	          //res代表success函数的事件对，data是固定的，fengxiang是是上面json数据中fengxiang
+17.	        })
+18.	      }
+19.	    })
+20.	  },
+21.	Api 
+22.	<view class="" hover-class="none" hover-stop-propagation="false" style="width: 100%; height: 100%;">
+23.	
+24.	  <map id="map" longitude="{{longitude}}" latitude=" {{latitude}}" markers="{{markers}}" scale="13" show-location style="width: 100%; height: 100%;"></map>
+25.	<view></view>
+26.	</view>
+27.	
+28.	Wxml function
+29.	page{
+30.	  height: 96%;
+31.	}
+32.	
+33.	Wxss function
+34.	<view class="root">
+35.	  <image class='background-image' src='./background.jpg' mode="aspectFill"></image>
+36.	
+37.	<button class='gps' bindtap="getLocation">
+38.	    <image class='gpsimage' src='./gps1.png'></image>
+39.	    <view>{{locationButton}}</view>
+40.	</button>
+41.	
+42.	</view>
+43.	Wxml index
+44.	page{
+45.	width:100%;
+46.	height:100%;
+47.	overflow: hidden;
+48.	}
+49.	
+50.	.header{
+51.	  text-align: center;
+52.	  color: rgb(0, 0, 0);
+53.	  font-size:  23px;
+54.	  padding: 23px 9%;
+55.	 
+56.	  line-height: 1.5;
+57.	}
+58.	
+59.	.gps{
+60.	  position: top;
+61.	  width: 300rpx;
+62.	  height: 300rpx;
+63.	  //margin-top: 20rpx;
+64.	  color: #000000;
+65.	  border-radius: 0rpx;
+66.	  display: flex;
+67.	  flex-direction: column;
+68.	  font-size: 40rpx;
+69.	
+70.	  background-color: transparent;   /*按钮透明*/  
+71.	   border:none;       /*设置按钮边框*/
+72.	 // background-color: #70c7da;
+73.	}
+74.	
+75.	.gpsimage{
+76.	  top: 100px;
+77.	  width: 300rpx;
+78.	  height: 300rpx;  
+79.	}
+80.	
+81.	.root {
+82.	   width: 100%;
+83.	    height: 100%;
+84.	    background-color: #70c7da;
+85.	    position: relative;
+86.	}
+87.	
+88.	.background-image{
+89.	   height : 100%;
+90.	    position: absolute;
+91.	    width: 100%;
+92.	    left: 0px;
+93.	    top: 0px;
+94.	}
+95.	
+96.	Wxss index
+97.	Page({
+98.	  data:{  
+99.	   header: "下图是您的家人在的位置",
+100.	   locationButton: "点击获取家人的位置信息"
+101.	  },
+102.	  getLocation: function () {
+103.	    wx.navigateTo({
+104.	      url: '../function/function',
+105.	    })
+106.	  }
+107.	})
+108.	
+109.	Js index
+110.	Page({
+111.	  data: {
+112.	    header: "欢迎来到盲人拐杖家属客户端",
+113.	    locationButton: "点击按钮进入程式中"
+114.	  },
+115.	  getLocation: function(){
+116.	    wx.navigateTo({
+117.	      url: '../index/index',
+118.	    })
+119.	  }
+120.	})
+121.	Start js
+122.	<view class='header'>{{header}}</view>
+123.	<button bindtap="getLocation" class="locationButton">{{locationButton}}</button>
+124.	
+125.	
+126.	Start wxml
+127.	page{
+128.	  background:#80acdfc0;
+129.	}
+130.	
+131.	.header{
+132.	  text-align: center;
+133.	  color: darkgreen;
+134.	  font-size:  40px;
+135.	  padding: 23px 9%;
+136.	 
+137.	  line-height: 1.5;
+138.	}
+139.	.locationButton{
+140.	  size: 200px;
+141.	  background-color: rgb(106, 143, 150);
+142.	  color: #3813db;
+143.	  font-size: 25px;
+144.	  top : 45px;
+145.	}
+146.	Wxss start
+147.	{
+148.	  "pages": [
+149.	    "pages/start/start",
+150.	    "pages/index/index",
+151.	    "pages/function/function"
+152.	  ],
+153.	  "window": {
+154.	    "backgroundTextStyle": "light",
+155.	    "navigationBarBackgroundColor": "#fff",
+156.	    "navigationBarTitleText": "盲人拐杖",
+157.	    "navigationBarTextStyle": "black"
+158.	  },
+159.	  "style": "v2",
+160.	  "sitemapLocation": "sitemap.json"
+161.	    
+162.	}
+163.	
+164.	
+165.	App jason
